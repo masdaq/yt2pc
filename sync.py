@@ -15,6 +15,7 @@ def download_mp3(video_id):
         return False
     cmd = [
         "yt-dlp",
+        "--cookies", "cookies.txt",
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "192K",

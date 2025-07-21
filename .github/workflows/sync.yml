@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: 3.12
       - run: pip install -r requirements.txt
+      - name: write cookies
+        run: |
+          echo "${{ secrets.YT_COOKIES }}" > cookies.txt
       - run: python sync.py
       - run: |
           git config user.name  github-actions
