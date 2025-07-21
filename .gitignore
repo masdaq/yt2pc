@@ -1,2 +1,3 @@
 podcasts/*.mp3
 node_modules/
+.github/workflows/*.swp
