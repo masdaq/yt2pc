@@ -18,7 +18,7 @@ def download_mp3(video_id):
         "--cookies", "cookies.txt",
         "--extract-audio",
         "--audio-format", "mp3",
-        "--audio-quality", "128K",
+        "--audio-quality", "96K",
         "-o", outtmpl,
         f"https://www.youtube.com/watch?v={video_id}"
     ]
