@@ -2,10 +2,14 @@ name: YT Playlist Sync
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # 30分おき
+    - cron: "*/30 * * * *"
   workflow_dispatch:
+    inputs:
+      url:
+        description: "Process single YouTube URL (optional)"
+        required: false
 
-# 同時実行の衝突を避ける（後から来たRunは前のRunをキャンセル）
+# 同時実行の衝突回避
 concurrency:
   group: yt2pc-playlist-sync
   cancel-in-progress: true
@@ -14,41 +18,56 @@ jobs:
   run:
     runs-on: ubuntu-latest
     env:
-      API_KEY:     ${{ secrets.YT_API_KEY }}
-      PLAYLIST_ID: ${{ secrets.PLAYLIST_ID }}
+      RAINDROP_RSS: ${{ vars.RAINDROP_RSS }}   # Secretsでも可
+      SINGLE_URL:   ${{ inputs.url }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: "3.12"
 
       - name: Install ffmpeg
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ffmpeg
 
-      - name: Write cookies
+      - name: Write cookies (if any)
         run: |
-          printf '%s' "${{ secrets.YT_COOKIES }}" > cookies.txt
+          if [ -n "${{ secrets.YT_COOKIES }}" ]; then
+            printf '%s' "${{ secrets.YT_COOKIES }}" > cookies.txt
+          fi
 
-      - run: pip install -r requirements.txt
-      - run: python sync.py
+      - name: Install deps
+        run: pip install -r requirements.txt
 
-      # ← これが “安全にpushする” ステップ
-      - name: Commit & push (safe)
+      - name: Run sync
+        run: python sync.py
+
+      # --- Xserver へ鍵でアップロード（mp3 & feed.xml） ---
+      - name: Add Xserver host key
         run: |
-          git config user.name  github-actions
-          git config user.email actions@github.com
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.XS_HOST }} >> ~/.ssh/known_hosts
 
-          # リモート(main)の最新に履歴だけ合わせ、作業ツリーの変更は保持
-          git fetch origin main
-          git reset --soft origin/main
+      - name: Ensure remote dir exists
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.XS_HOST }}
+          username: ${{ secrets.XS_USER }}
+          key:      ${{ secrets.XS_SSH_KEY }}
+          port:     ${{ secrets.XS_SSH_PORT || 22 }}
+          script: |
+            mkdir -p /home/${{ secrets.XS_USER }}/<ドメイン>/public_html/podcasts/
 
-          # 生成物だけをもう一度コミット
-          git add podcasts/*.mp3 podcasts/feed.xml
-          git commit -m "update feed & mp3" || exit 0
-
-          # 確実に main へ push
-          git push origin HEAD:main
+      - name: Upload to Xserver (scp)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.XS_HOST }}
+          username: ${{ secrets.XS_USER }}
+          key:      ${{ secrets.XS_SSH_KEY }}
+          port:     ${{ secrets.XS_SSH_PORT || 22 }}
+          source:   "podcasts/*"
+          target:   "/home/${{ secrets.XS_USER }}/<ドメイン>/public_html/podcasts/"
+          overwrite: true
