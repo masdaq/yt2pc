@@ -16,9 +16,9 @@ jobs:
   run:
     runs-on: ubuntu-latest
     env:
-      RAINDROP_RSS: ${{ vars.RAINDROP_RSS }}  # ← Raindrop の RSS を Variables/Secrets に入れておく
-      SINGLE_URL:   ${{ inputs.url }}         # 共有シートから単発で投げるとき用
-    steps:
+      RAINDROP_RSS: ${{ vars.RAINDROP_RSS }}
+      # ここを “${{ github.event.inputs.url }}” に
+      SINGLE_URL:   ${{ github.event.inputs.url }}    steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -41,4 +41,8 @@ jobs:
       - name: Run sync
         run: python sync.py
 
+- name: Debug inputs
+  run: |
+    echo "RAINDROP_RSS=${RAINDROP_RSS}"
+    echo "SINGLE_URL=${SINGLE_URL}"
       # （この下に Xserver へのアップロードがあるならそのまま）
