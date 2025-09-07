@@ -48,11 +48,7 @@ def get_title_via_ytdlp(url: str) -> str:
     return extract_video_id(url)
 
 def ytdlp_auth_args() -> list:
-    """Cookieの渡し方を決める。self-hostedなら --cookies-from-browser、それ以外は cookies.txt があれば使う。"""
-    if USE_BROWSER:
-        return ["--cookies-from-browser", BROWSER_NAME]
-    if Path(COOKIES_TXT).exists():
-        return ["--cookies", COOKIES_TXT]
+    # 常に無認証で実行（Cookieを使わない）
     return []
 
 def shrink_if_needed(mp3_path: Path):
