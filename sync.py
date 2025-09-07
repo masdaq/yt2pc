@@ -98,17 +98,23 @@ def download_mp3(url: str) -> tuple[str, bool]:
     return vid, True
 
 def add_feed_entry(fg, *, vid: str, title: str, published: datetime | None, page_url: str):
+    path = POD_DIR / f"{vid}.mp3"
+    if not path.exists():
+        log(f"[feed] skip add: mp3 not found for {vid}")
+        return False
+
     fe = fg.add_entry(order="prepend")
     fe.id(vid)
     fe.title(title)
     fe.link(href=page_url)
     fe.enclosure(
         url=f"{SITE_URL}{vid}.mp3",
-        length=str((POD_DIR / f"{vid}.mp3").stat().st_size),
+        length=str(path.stat().st_size),
         type="audio/mpeg",
     )
     fe.pubDate(published or datetime.now(timezone.utc))
-
+    return True
+    
 def existing_ids_from_feed() -> set[str]:
     if FEED_PATH.exists():
         try:
@@ -157,15 +163,19 @@ def main():
     fg = load_or_create_feed()
     already = existing_ids_from_feed()
 
-    for url, title, pub_dt in iter_source_items():
-        vid, created = download_mp3(url)
-        if not created:
-            # すでに mp3 がある or 失敗。feed に未登録なら登録だけする
-            if vid in already:
-                continue
-        if vid in already:
-            continue
-        add_feed_entry(fg, vid=vid, title=title or vid, published=pub_dt, page_url=url)
+for url, title, pub_dt in iter_source_items():
+    vid, created = download_mp3(url)
+    path = POD_DIR / f"{vid}.mp3"
+
+    # ダウンロード失敗（CAPTCHA等）や未生成なら feed も追加しない
+    if not path.exists():
+        log(f"[skip-feed] {vid}: no mp3 -> not adding to feed")
+        continue
+
+    if vid in already:
+        continue
+
+    if add_feed_entry(fg, vid=vid, title=title or vid, published=pub_dt, page_url=url):
         changed_any = True
 
     if changed_any:
